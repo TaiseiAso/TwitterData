@@ -16,7 +16,7 @@ import MeCab
 
 
 # Twitter API の情報を読み込む
-config = yaml.load(open("config/twitter.yml", 'rt'))
+config = yaml.load(stream=open("config/twitter.yml", 'rt'), Loader=yaml.SafeLoader)
 
 # 分かち書きするモジュール
 tagger = MeCab.Tagger('-Owakati')
