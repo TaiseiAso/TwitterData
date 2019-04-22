@@ -316,12 +316,14 @@ class QueueListener(StreamListener):
         for line in lines:
             add_result = ""
             morphemes = tagger.parse(line).strip().split()
+
             for morpheme in morphemes:
                 if morpheme not in ["ノ", "ーノ", "ロ", "艸", "屮", "罒", "灬", "彡", "ヮ", "益",\
                 "皿", "タヒ", "厂", "厂厂", "啞", "卍", "ノノ", "ノノノ", "ノシ", "ノツ",\
                 "癶", "癶癶", "乁", "乁厂", "マ", "んご", "んゴ", "ンゴ", "にき", "ニキ", "ナカ", "み", "ミ"]:
                     if morpheme not in ["つ", "っ"] or add_result != "":
                         add_result += morpheme + " "
+
             add_result = add_result.strip()
             if add_result not in ["、", "。", "！", "？", "!?", "", "... 。", "... ！", "... ？", "... !?",\
             "人 。", "つ 。", "っ 。", "笑 。", "笑 ！", "笑 ？", "笑 !?"]:
