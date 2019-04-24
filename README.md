@@ -1,6 +1,6 @@
 # TwitterData
 ***
-二話者による複数ターン対話をTwitterからリアルタイム収集するツール
+Tool to collect multi-turn dialogues by two talker from Twitter in real time.
 
 ## Requirement
 - python3
@@ -8,10 +8,10 @@
 - tweepy
 - MeCab (mecab-ipadic-NEologd)
 - Twitter API key
- - consumer_key
- - consumer_secret
- - access_token
- - access_token_secret
+    - consumer_key
+    - consumer_secret
+    - access_token
+    - access_token_secret
 
 ## Usage
 1. Get Twitter API key and save file "config/api.yml".
