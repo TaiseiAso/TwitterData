@@ -6,7 +6,7 @@ Tool to collect multi-turn dialogues by two talker from Twitter in real time.
 - python3
 - yaml
 - tweepy
-- MeCab (mecab-ipadic-NEologd)
+- MeCab
 - Twitter API key
     - consumer_key
     - consumer_secret
