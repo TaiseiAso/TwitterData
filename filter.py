@@ -18,8 +18,8 @@ rm = re.compile("^>")
 
 def check(line, fi):
     """
-    入力文をフィルタ処理して適切かどうかを判定する
-    @param line 入力文
+    テキストをフィルタ処理して適切かどうかを判定する
+    @param line テキスト
     @param fi 設定ファイルのフィルタ処理内容の情報
     @return True: 適切、False: 不適切
     """
@@ -63,6 +63,11 @@ def filtering(config):
     fn = config['filename']
     fi = config['filter']
 
+    # dataフォルダがなければ終了
+    if not os.path.isdir("data"):
+        print("no data folder")
+        return
+
     # filteredフォルダがなければ作成する
     if not os.path.isdir("filtered"):
         os.mkdir("filtered")
@@ -72,43 +77,43 @@ def filtering(config):
         for name in files:
             os.remove(os.path.join(root, name))
 
-    # dataフォルダがなければ終了
-    if os.path.isdir("data"):
+    filtered = False
 
-        # 入力ファイルと出力ファイルのペアをフィルタリング
-        if os.path.isfile("data/" + fn['input_file'] + ".txt") and os.path.isfile("data/" + fn['target_file'] + ".txt"):
-            cnt, cnt_ = 0, 0
+    # 入力ファイルと出力ファイルのペアをフィルタリング
+    if os.path.isfile("data/" + fn['input_file'] + ".txt") and os.path.isfile("data/" + fn['target_file'] + ".txt"):
+        filtered = True
+        cnt, cnt_ = 0, 0
 
-            with open("data/" + fn['input_file'] + ".txt", 'r', encoding='utf-8') as f_in,\
-            open("data/" + fn['target_file'] + ".txt", 'r', encoding='utf-8') as f_tar,\
-            open("filtered/" + fn['input_file'] + ".txt", 'w', encoding='utf-8') as f_in_filtered,\
-            open("filtered/" + fn['target_file'] + ".txt", 'w', encoding='utf-8') as f_tar_filtered:
+        with open("data/" + fn['input_file'] + ".txt", 'r', encoding='utf-8') as f_in,\
+        open("data/" + fn['target_file'] + ".txt", 'r', encoding='utf-8') as f_tar,\
+        open("filtered/" + fn['input_file'] + ".txt", 'w', encoding='utf-8') as f_in_filtered,\
+        open("filtered/" + fn['target_file'] + ".txt", 'w', encoding='utf-8') as f_tar_filtered:
+
+            line_in = f_in.readline()
+            line_tar = f_tar.readline()
+
+            while line_in and line_tar:
+                cnt += 1
+                if check(line_in, fi) and check(line_tar, fi) and diff_check(line_in, line_tar, fi):
+                    cnt_ += 1
+                    f_in_filtered.write(line_in)
+                    f_tar_filtered.write(line_tar)
 
                 line_in = f_in.readline()
                 line_tar = f_tar.readline()
 
-                while line_in and line_tar:
-                    cnt += 1
-                    if check(line_in, fi) and check(line_tar, fi) and diff_check(line_in, line_tar, fi):
-                        cnt_ += 1
-                        f_in_filtered.write(line_in)
-                        f_tar_filtered.write(line_tar)
+        print(fn['input_file'] + "/" + fn['target_file'] + ": " + str(cnt) + " -> " + str(cnt_))
 
-                    line_in = f_in.readline()
-                    line_tar = f_tar.readline()
+    # 入力か出力の一方のファイルしかない場合は単体でフィルタリング
+    else:
+        file = None
+        if os.path.isfile("data/" + fn['input_file'] + ".txt"):
+            file = fn['input_file']
+        elif os.path.isfile("data/" + fn['target_file'] + ".txt"):
+            file = fn['target_file']
 
-            print(fn['input_file'] + "/" + fn['target_file'] + ": " + str(cnt) + " -> " + str(cnt_))
-
-        # 入力か出力の一方のファイルしかない場合は単体でフィルタリング
-        else:
-            if os.path.isfile("data/" + fn['input_file'] + ".txt"):
-                file = fn['input_file']
-            elif os.path.isfile("data/" + fn['target_file'] + ".txt"):
-                file = fn['target_file']
-            else:
-                print("no file")
-                return
-
+        if file:
+            filtered = True
             cnt, cnt_ = 0, 0
 
             with open("data/" + file + ".txt", 'r', encoding='utf-8') as f,\
@@ -126,60 +131,64 @@ def filtering(config):
 
             print(file + ": " + str(cnt) + " -> " + str(cnt_))
 
-        # 複数ターン対話をフィルタリング
-        if os.path.isfile("data/" + fn['dialog_file'] + ".txt"):
-            cnt, cnt_ = 0, 0
+    # 複数ターン対話をフィルタリング
+    if os.path.isfile("data/" + fn['dialog_file'] + ".txt"):
+        filtered = True
+        cnt, cnt_ = 0, 0
 
-            with open("data/" + fn['dialog_file'] + ".txt", 'r', encoding='utf-8') as f,\
-            open("filtered/" + fn['dialog_file'] + ".txt", 'w', encoding='utf-8') as f_filtered:
+        with open("data/" + fn['dialog_file'] + ".txt", 'r', encoding='utf-8') as f,\
+        open("filtered/" + fn['dialog_file'] + ".txt", 'w', encoding='utf-8') as f_filtered:
 
-                min, max = 0, 0
-                line = f.readline()
-                queue = []
-                buf = []
+            min, max = 0, 0
+            line = f.readline()
+            queue = []
+            buf = []
 
-                while line:
-                    dump = False
+            while line:
+                dump = False
 
-                    if rm.search(line):
-                        cnt += 1
-                        dump = True
-                        min = -1
-                        buf = []
-                    elif check(line, fi):
-                        length = len(line.split())
-                        if min == -1:
-                            min = max = length
+                if rm.search(line):
+                    cnt += 1
+                    dump = True
+                    min = -1
+                    buf = []
+                elif check(line, fi):
+                    length = len(line.split())
+                    if min == -1:
+                        min = max = length
+                        queue.append(line)
+                    else:
+                        if min > length:
+                            min = length
+                        elif max < length:
+                            max = length
+                        if max - min <= fi['len_diff']:
                             queue.append(line)
                         else:
-                            if min > length:
-                                min = length
-                            elif max < length:
-                                max = length
-                            if max - min <= fi['len_diff']:
-                                queue.append(line)
-                            else:
-                                dump = True
-                                min = max = length
-                                buf = [line]
-                    else:
-                        dump = True
-                        min = -1
-                        buf = []
+                            dump = True
+                            min = max = length
+                            buf = [line]
+                else:
+                    dump = True
+                    min = -1
+                    buf = []
 
-                    line = f.readline()
-                    if not line:
-                        dump = True
+                line = f.readline()
+                if not line:
+                    dump = True
 
-                    if dump:
-                        if fi['turn_min'] < len(queue) and len(queue) - 1 <= fi['turn_max']:
-                            cnt_ += 1
-                            f_filtered.write("> " + str(cnt_) + " --------------------\n")
-                            for tweet in queue:
-                                f_filtered.write(tweet)
-                        queue = buf
+                if dump:
+                    if fi['turn_min'] < len(queue) and len(queue) - 1 <= fi['turn_max']:
+                        cnt_ += 1
+                        f_filtered.write("> " + str(cnt_) + " --------------------\n")
+                        for tweet in queue:
+                            f_filtered.write(tweet)
+                    queue = buf
 
-            print(fn['dialog_file'] + ": " + str(cnt) + " -> " + str(cnt_))
+        print(fn['dialog_file'] + ": " + str(cnt) + " -> " + str(cnt_))
+
+    if not filtered:
+        print("no filtered file")
 
 
 if __name__ == '__main__':

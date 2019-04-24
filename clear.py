@@ -10,8 +10,16 @@ __date__ = "23 Apr 2019"
 import os
 
 
-# dataフォルダとtmpフォルダとfilteredフォルダの中のファイルをすべて削除
-for top in ["data", "tmp", "filtered"]:
-    for root, _, files in os.walk(top, topdown=False):
-        for name in files:
-            os.remove(os.path.join(root, name))
+def clear(folders):
+    """
+    指定したフォルダの中のファイルをすべて削除
+    @param folders 中身を削除するフォルダのリスト
+    """
+    for top in folders:
+        for root, _, files in os.walk(top, topdown=False):
+            for name in files:
+                os.remove(os.path.join(root, name))
+
+
+if __name__ == '__main__':
+    clear(["data", "tmp", "filtered"])

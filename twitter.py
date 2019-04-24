@@ -133,7 +133,7 @@ class QueueListener(StreamListener):
         """
         処理すべきデータが飛んできた際に呼ばれるメソッド
         @param data json形式のツイートデータ
-        @return 処理が成功したかどうか
+        @return True: 成功、False: 失敗
         """
         # json形式のデータを読み込む
         raw = json.loads(data)
@@ -148,7 +148,7 @@ class QueueListener(StreamListener):
         """
         ツイートをキューに保存する
         @param raw ツイートデータの構造体
-        @return 処理が成功したかどうか
+        @return True: 成功、False: 失敗
         """
         if isinstance(raw.get('in_reply_to_status_id'), int):
             line = [raw['in_reply_to_status_id'], raw['user']['id'], self.del_username(unicodedata.normalize('NFKC', raw['text'])), raw['id']]
@@ -171,7 +171,7 @@ class QueueListener(StreamListener):
         """
         キューにあるツイートに対応するリプライ先を一斉に一度だけ取得
         リプライ先がそれ以上存在しないデータはファイルに保存
-        @return 処理が成功したかどうか
+        @return True: 成功、False: 失敗
         """
         ids = []
         for lines in self.queue:
@@ -221,7 +221,7 @@ class QueueListener(StreamListener):
         """
         対話データをファイルに保存する
         @param lines 保存する対話データ
-        @return 処理が成功したかどうか
+        @return True: 成功、False: 失敗
         """
         # 時系列順に並べ替え
         lines.reverse()
@@ -270,7 +270,7 @@ class QueueListener(StreamListener):
         """
         ツイートデータのテキストに不適切な情報が含まれていないかを判定
         @param tweet ツイートデータのテキスト
-        @return 不適切な情報が含まれていないかどうか
+        @return True: 適切、False: 不適切
         """
         # URLを含む（画像も含む？）
         if re.compile("((ftp|http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&amp;%@!&#45;\/]))?)").search(tweet):
@@ -299,7 +299,7 @@ class QueueListener(StreamListener):
         """
         二話者の交互発話による対話であるかを判定
         @param talker 話者ID
-        @return 適切な話者であるかどうか
+        @return True: 適切、False: 不適切
         """
         if talker != self.queue[idx][-1][1] and (len(self.queue[idx]) == 1 or talker == self.queue[idx][-2][1]):
             return True
@@ -387,7 +387,7 @@ class QueueListener(StreamListener):
     def save_tmp(self):
         """
         ツイートIDのリストや、収集した対話数をチェックポイントとして一時保存
-        @return 処理が成功したかどうか
+        @return True: 成功、False: 失敗
         """
         if not os.path.isdir("tmp"):
             os.mkdir("tmp")
@@ -406,7 +406,7 @@ class QueueListener(StreamListener):
     def load_tmp(self):
         """
         チェックポイントを読み込む
-        @return 処理が成功したかどうか
+        @return True: 成功、False: 失敗
         """
         if os.path.isdir("tmp"):
             if os.path.isfile("tmp/cnt.txt"):
