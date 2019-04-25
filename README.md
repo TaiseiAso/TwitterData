@@ -59,7 +59,7 @@
     - len_min: 全体の長さの最小
     - len_max: 全体の長さの最大
     - sent_len_min: 文単位の長さの最小
-    - sent_len_max: 文単位の長さの最小
+    - sent_len_max: 文単位の長さの最大
     - sent_min: 含まれる文の数の最小
     - sent_max: 含まれる文の数の最大
     - turn_min: 取得する複数ターン対話の最小ターン数
