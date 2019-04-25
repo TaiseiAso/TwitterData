@@ -10,7 +10,12 @@ __date__ = "24 Apr 2019"
 import os
 import yaml
 import re
+import MeCab
 
+
+# 分かち書きするモジュール
+tagger = MeCab.Tagger('-Ochasen')
+tagger.parseToNode('')
 
 # データ内の不必要な部分にマッチングするパターン
 rm = re.compile("^>")
@@ -94,6 +99,7 @@ def filtering(config):
 
             while line_in and line_tar:
                 cnt += 1
+
                 if check(line_in, fi) and check(line_tar, fi) and diff_check(line_in, line_tar, fi):
                     cnt_ += 1
                     f_in_filtered.write(line_in)
@@ -123,6 +129,7 @@ def filtering(config):
 
                 while line:
                     cnt += 1
+
                     if check(line, fi):
                         cnt_ += 1
                         f_filtered.write(line)

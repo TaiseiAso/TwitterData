@@ -253,7 +253,7 @@ class QueueListener(StreamListener):
         # 標準出力に進捗状況を出力
         print("#", end="", flush=True)
         if self.dialog_cnt % 10 == 0:
-            print(" (" + str(self.dialog_cnt) + ":" + str(self.turn_cnt) + ") " + ('%.2f' % (self.cum_time + time.time() - self.start_time)) + "[sec]", flush=True)
+            print(" (" + self.inp_fn + "/" + self.tar_fn + ": " + str(self.dialog_cnt) + ", " + self.dig_fn + ": " + str(self.turn_cnt) + ") " + ('%.2f' % (self.cum_time + time.time() - self.start_time)) + "[sec]", flush=True)
 
         return True
 
