@@ -5,7 +5,7 @@
 
 ## 要件
 - python3
-- yaml
+- pyyaml
 - tweepy
 - MeCab
 - Twitter API key を取得
