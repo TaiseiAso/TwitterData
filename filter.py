@@ -182,7 +182,8 @@ def filtering(config):
                     dump = True
 
                 if dump:
-                    if fi['turn_min'] < len(queue) and len(queue) - 1 <= fi['turn_max']:
+                    len_queue = len(queue)
+                    if 1 < len_queue and fi['turn_min'] < len_queue and len_queue - 1 <= fi['turn_max']:
                         cnt_ += 1
                         for tweet in queue:
                             f_filtered.write(tweet)
