@@ -17,9 +17,6 @@ import MeCab
 tagger = MeCab.Tagger('-Ochasen')
 tagger.parseToNode('')
 
-# データ内の不必要な部分にマッチングするパターン
-rm = re.compile("^>")
-
 
 def check(line, fi):
     """
@@ -154,7 +151,7 @@ def filtering(config):
             while line:
                 dump = False
 
-                if rm.search(line):
+                if line == "\n":
                     cnt += 1
                     dump = True
                     min = -1
@@ -187,9 +184,9 @@ def filtering(config):
                 if dump:
                     if fi['turn_min'] < len(queue) and len(queue) - 1 <= fi['turn_max']:
                         cnt_ += 1
-                        f_filtered.write("> " + str(cnt_) + " --------------------\n")
                         for tweet in queue:
                             f_filtered.write(tweet)
+                        f_filtered.write("\n")
                     queue = buf
 
         print(fn['dialog_file'] + ": " + str(cnt) + " -> " + str(cnt_))

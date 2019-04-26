@@ -242,9 +242,9 @@ class QueueListener(StreamListener):
 
         if self.dig_fd:
             with open("data/" + self.dig_fn + ".txt", 'a', encoding='utf-8') as f:
-                f.write("> " + str(self.dialog_cnt) + " --------------------\n")
                 for tweet in tweets:
                     f.write(tweet + "\n")
+                f.write("\n")
 
         if self.trn_fd:
             with open("data/" + self.inp_fn + ".txt", 'a', encoding='utf-8') as f_in,\

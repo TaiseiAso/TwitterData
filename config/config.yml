@@ -9,9 +9,9 @@ dump:
 
 filter:
     len_min         : 6
-    len_max         : 30
-    sent_len_min    : 3
-    sent_len_max    : 15
+    len_max         : 24
+    sent_len_min    : 4
+    sent_len_max    : 16
     sent_min        : 1
     sent_max        : 3
     turn_min        : 1
