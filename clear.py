@@ -2,24 +2,22 @@
 
 """収集した対話データやチェックポイントを削除"""
 __author__ = "Aso Taisei"
-__version__ = "1.0.1"
-__date__ = "23 Apr 2019"
+__version__ = "1.0.2"
+__date__ = "26 Apr 2019"
 
 
 # 必要なモジュールをインポート
 import os
 
 
-def clear(folders):
+def delete(folders):
     """
-    指定したフォルダの中のファイルをすべて削除
-    @param folders 中身を削除するフォルダのリスト
+    指定したフォルダをすべて削除する
+    @param folders 削除するフォルダのリスト
     """
-    for top in folders:
-        for root, _, files in os.walk(top, topdown=False):
-            for name in files:
-                os.remove(os.path.join(root, name))
+    for folder in folders:
+        os.system("rm -rf " + folder)
 
 
 if __name__ == '__main__':
-    clear(["data", "tmp", "filtered"])
+    delete(["data", "tmp", "filtered"])
