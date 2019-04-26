@@ -69,6 +69,9 @@ class QueueListener(StreamListener):
         self.auth.set_access_token(cfg_auth['access_token'], cfg_auth['access_token_secret'])
         self.api = tweepy.API(self.auth)
 
+        # 進捗を表示するかどうかを取得
+        self.progress = config['print']['progress']
+
     # 例外処理 #################################################################
     def on_error(self, status):
         """
@@ -251,11 +254,16 @@ class QueueListener(StreamListener):
                     f_tar.write(tweets[i + 1] + "\n")
 
         # 標準出力に進捗状況を出力
-        print("#", end="", flush=True)
-        if self.dialog_cnt % 10 == 0:
-            print(" (" + self.dig_fn + ": " + str(self.dialog_cnt) + ", " + self.inp_fn + "/" + self.tar_fn + ": " + str(self.turn_cnt) + ") " + ('%.2f' % (self.cum_time + time.time() - self.start_time)) + "[sec]", flush=True)
+        if self.progress:
+            print("#", end="", flush=True)
+            if self.dialog_cnt % 10 == 0:
+                self.log()
 
         return True
+
+    def log(self):
+        """収集したツイート数や経過時間を出力"""
+        print(" (" + self.dig_fn + ": " + str(self.dialog_cnt) + ", " + self.inp_fn + "/" + self.tar_fn + ": " + str(self.turn_cnt) + ") " + ('%.2f' % (self.cum_time + time.time() - self.start_time)) + "[sec]", flush=True)
 
     def del_username(self, tweet):
         """
@@ -443,6 +451,7 @@ def get_twitter_corpus(config, api_config):
             stream.filter(languages=["ja"], track=['。', '，', '！', '.', '!', ',', '?', '？', '、', '私', '俺', '(', ')', '君', 'あなた'])
 
         except KeyboardInterrupt:
+            listener.log()
             listener.save_tmp()
             stream.disconnect()
             break

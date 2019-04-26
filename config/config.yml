@@ -17,3 +17,6 @@ filter:
     turn_min        : 1
     turn_max        : 5
     len_diff        : 10
+
+print:
+    progress    : on
