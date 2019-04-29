@@ -104,9 +104,6 @@ class QueueListener(StreamListener):
         self.reading_point_token = pt['reading_point']
         self.other_token = pt['other']
 
-        # 標準形が存在しない場合の文字列
-        self.unk_standard = config['unknown_standard']
-
     # 例外処理 #################################################################
     def on_error(self, status):
         """
@@ -346,19 +343,13 @@ class QueueListener(StreamListener):
         # ハッシュタグを含む
         if re.compile("(?:^|[^ーー゛゜々ヾヽぁ-ヶ一-龠a-zA-Z0-9&_/>]+)[#＃]([ー゛゜々ヾヽぁ-ヶ一-龠a-zA-Z0-9_]*[ー゛゜々ヾヽぁ-ヶ一-龠a-zA-Z]+[ー゛゜々ヾヽぁ-ヶ一-龠a-zA-Z0-9_]*)").search(text):
             return False
-        # 英数字や特定の記号を含む
-        if re.compile("[a-zA-Z0-9_]").search(text):
+        # 英数字を含む
+        if re.compile("[a-zA-Z0-9]").search(text):
             return False
         # ツイッター用語を含む
-        if re.compile("アイコン|あいこん|トプ|とぷ|ヘッダー|へっだー|たぐ|ツイ|ツイート|ついーと|ふぉろ|フォロ|リプ|りぷ|リツ|りつ|いいね|お気に入り|ふぁぼ|ファボ|リム|りむ|ブロック|ぶろっく|スパブロ|すぱぶろ|ブロ解|ぶろ解|鍵|アカ|垢|タグ|ダイレクトメッセージ|空りぷ|空リプ|巻き込|まきこ|マキコ").search(text):
+        if re.compile("アイコン|あいこん|トプ|とぷ|ヘッダー|へっだー|たぐ|タグ|ツイ|つい|ふぉろ|フォロ|リプ|りぷ|リツ|りつ|いいね|お気に入り|ふぁぼ|ファボ|リム|りむ|ブロック|ぶろっく|スパブロ|すぱぶろ|ブロ解|ぶろ解|鍵|アカ|垢|ダイレクトメッセージ|巻き込|まきこ").search(text):
             return False
-        # 時期の表現を含む
-        if re.compile("明日|あした|明後日|あさって|明々後日|明明後日|しあさって|今日|昨日|おととい|きょう|きのう|一昨日|来週|再来週|今年|先週|先々週|今年|去年|来年|おととい|らいしゅう|さらいしゅう|せんしゅう|せんせんしゅう|きょねん|らいねん|ことし|こんねん").search(text):
-            return False
-        # 漢数字を含む
-        if re.compile("[一二三四五六七八九十百千万億兆〇]").search(text):
-            return False
-        # 特定のネットスラングを含む
+        # 特定のスラングを含む
         if re.compile("ナカーマ|イキスギ|いきすぎ|スヤァ|すやぁ|うぇーい|ウェーイ|おなしゃす|アザッス|あざっす|ドヤ|どや|ワカリミ|わかりみ").search(text):
             return False
         return True
@@ -445,6 +436,10 @@ class QueueListener(StreamListener):
                     node = node.next
                     continue
 
+                if node.surface in [".", "!", "?"]:
+                    nod = node.next
+                    continue
+
                 if node.surface in ["ノ", "ーノ", "ロ", "艸", "屮", "罒", "灬", "彡", "ヮ", "益",\
                 "皿", "タヒ", "厂", "厂厂", "啞", "卍", "ノノ", "ノノノ", "ノシ", "ノツ",\
                 "癶", "癶癶", "乁", "乁厂", "マ", "んご", "んゴ", "ンゴ", "にき", "ニキ", "ナカ", "み", "ミ"]:
@@ -485,12 +480,10 @@ class QueueListener(StreamListener):
                     token = self.other_token
 
                 add_result += node.surface + " "
-                if re.compile("[^ぁ-んァ-ヶｧ-ｳﾞ一-龠々ー～]").search(feature[6]):
+                if re.compile("[^ぁ-んァ-ヶｧ-ｳﾞ一-龠々ー～]").search(feature[6]) or\
+                token in [self.three_dots_token, self.phrase_point_token, self.reading_point_token] or\
+                node.surface in ["ー", "～"]:
                     add_standard += node.surface + " "
-                elif token in [self.three_dots_token, self.phrase_point_token, self.reading_point_token]:
-                    add_standard += node.surface + " "
-                elif feature[6] == "*":
-                    add_standard += self.unk_standard + " "
                 else:
                     add_standard += feature[6] + " "
                 add_part += token + " "
@@ -578,7 +571,7 @@ if __name__ == '__main__':
     # 設定ファイルを読み込む
     config = yaml.load(stream=open("config/config.yml", 'rt', encoding='utf-8'), Loader=yaml.SafeLoader)
     # Twitter API の情報を読み込む
-    api_config = yaml.load(stream=open("config/api.yml", 'rt'), Loader=yaml.SafeLoader)
+    api_config = yaml.load(stream=open("config/api.yml", 'rt', encoding='utf-8'), Loader=yaml.SafeLoader)
 
     # ツイート収集開始
     get_twitter_corpus(config, api_config)

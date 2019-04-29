@@ -53,72 +53,31 @@ class TweetFilter():
         self.len_diff = fi_len['len_diff']
 
         fi_dp = fi['dump']
-        noun_dump = fi_dp['noun']
-        verb_dump = fi_dp['verb']
-        adjective_dump = fi_dp['adjective']
-        adverb_dump = fi_dp['adverb']
-        particle_dump = fi_dp['particle']
-        auxiliary_verb_dump = fi_dp['auxiliary_verb']
-        conjunction_dump = fi_dp['conjunction']
-        prefix_dump = fi_dp['prefix']
-        filler_dump = fi_dp['filler']
-        impression_verb_dump = fi_dp['impression_verb']
-        three_dots_dump = fi_dp['three_dots']
-        phrase_point_dump = fi_dp['phrase_point']
-        reading_point_dump = fi_dp['reading_point']
-        other_dump = fi_dp['other']
         self.dump_list = [
-            noun_dump, verb_dump, adjective_dump,
-            adverb_dump, particle_dump, auxiliary_verb_dump,
-            conjunction_dump, prefix_dump, filler_dump,
-            impression_verb_dump, three_dots_dump, phrase_point_dump,
-            reading_point_dump, other_dump
+            fi_dp['noun'], fi_dp['verb'], fi_dp['adjective'],
+            fi_dp['adverb'], fi_dp['particle'], fi_dp['auxiliary_verb'],
+            fi_dp['conjunction'], fi_dp['prefix'], fi_dp['filler'],
+            fi_dp['impression_verb'], fi_dp['three_dots'], fi_dp['phrase_point'],
+            fi_dp['reading_point'], fi_dp['other']
         ]
 
         fi_ex = fi['exist']
-        noun_exist = fi_ex['noun']
-        verb_exist = fi_ex['verb']
-        adjective_exist = fi_ex['adjective']
-        adverb_exist = fi_ex['adverb']
-        particle_exist = fi_ex['particle']
-        auxiliary_verb_exist = fi_ex['auxiliary_verb']
-        conjunction_exist = fi_ex['conjunction']
-        prefix_exist = fi_ex['prefix']
-        filler_exist = fi_ex['filler']
-        impression_verb_exist = fi_ex['impression_verb']
-        three_dots_exist = fi_ex['three_dots']
-        phrase_point_exist = fi_ex['phrase_point']
-        reading_point_exist = fi_ex['reading_point']
         self.exist_list = [
-            noun_exist, verb_exist, adjective_exist,
-            adverb_exist, particle_exist, auxiliary_verb_exist,
-            conjunction_exist, prefix_exist, filler_exist,
-            impression_verb_exist, three_dots_exist, phrase_point_exist,
-            reading_point_exist
+            fi_ex['noun'], fi_ex['verb'], fi_ex['adjective'],
+            fi_ex['adverb'], fi_ex['particle'], fi_ex['auxiliary_verb'],
+            fi_ex['conjunction'], fi_ex['prefix'], fi_ex['filler'],
+            fi_ex['impression_verb'], fi_ex['three_dots'], fi_ex['phrase_point'],
+            fi_ex['reading_point']
         ]
 
         # 品詞のトークンを取得
         pt = config['part']
-        noun_token = pt['noun']
-        verb_token = pt['verb']
-        adjective_token = pt['adjective']
-        adverb_token = pt['adverb']
-        particle_token = pt['particle']
-        auxiliary_verb_token = pt['auxiliary_verb']
-        conjunction_token = pt['conjunction']
-        prefix_token = pt['prefix']
-        filler_token = pt['filler']
-        impression_verb_token = pt['impression_verb']
-        three_dots_token = pt['three_dots']
-        phrase_point_token = pt['phrase_point']
-        reading_point_token = pt['reading_point']
-        other_token = pt['other']
         self.token_list = [
-            noun_token, verb_token, adjective_token,
-            adverb_token, particle_token, auxiliary_verb_token,
-            conjunction_token, prefix_token, filler_token,
-            impression_verb_token, three_dots_token, phrase_point_token,
-            reading_point_token, other_token
+            pt['noun'], pt['verb'], pt['adjective'],
+            pt['adverb'], pt['particle'], pt['auxiliary_verb'],
+            pt['conjunction'], pt['prefix'], pt['filler'],
+            pt['impression_verb'], pt['three_dots'], pt['phrase_point'],
+            pt['reading_point'], pt['other']
         ]
 
     def text_check(self, text):
@@ -136,10 +95,10 @@ class TweetFilter():
         if len(sents) < self.sent_min or self.sent_max < len(sents):
             return False
 
-        for i in range(len(sents)):
-            if i == len(sents) - 1 and sents[i] == "":
+        for i, sent in enumerate(sents):
+            if i == len(sents) - 1 and sent == "":
                 continue
-            words = sents[i].split()
+            words = sent.split()
             if len(words) + 1 < self.sent_len_min or self.sent_len_max < len(words) + 1:
                 return False
 
@@ -183,19 +142,19 @@ class TweetFilter():
 
         if standards:
             for word, standard, part in zip(words, standards, parts):
-                for dump, token in zip(self.dump_list, self.token_list):
-                    if dump and part == token:
+                if part in self.token_list:
+                    part_idx = self.token_list.index(part)
+                    if self.dump_list[part_idx]:
                         result_text += word + " "
                         result_standard += standard + " "
                         result_part += part + " "
-                        break
         else:
             for word, part in zip(words, parts):
-                for dump, token in zip(self.dump_list, self.token_list):
-                    if dump and part == token:
+                if part in self.token_list:
+                    part_idx = self.token_list.index(part)
+                    if self.dump_list[part_idx]:
                         result_text += word + " "
                         result_part += part + " "
-                        break
 
         return result_text.strip() + "\n", result_standard.strip() + "\n" if standards else None, result_part.strip() + "\n"
 
