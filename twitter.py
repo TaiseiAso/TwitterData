@@ -2,8 +2,8 @@
 
 """Twitterから二話者間の複数ターンの長文対話を取得"""
 __author__ = "Aso Taisei"
-__version__ = "1.0.1"
-__date__ = "24 Apr 2019"
+__version__ = "1.0.2"
+__date__ = "29 Apr 2019"
 
 
 # 必要モジュールのインポート
@@ -20,7 +20,7 @@ import MeCab
 
 
 # 分かち書きするモジュール
-tagger = MeCab.Tagger('-Owakati')
+tagger = MeCab.Tagger('-Ochasen')
 
 # 指定した複数のインデックスに対応する要素をリストから削除するラムダ式
 dellist = lambda items, indices: [item for idx, item in enumerate(items) if idx not in indices]
@@ -54,14 +54,29 @@ class QueueListener(StreamListener):
 
         # 保存ファイル名の情報取得
         fn = config['filename']
-        self.inp_fn = fn['input_file']
-        self.tar_fn = fn['target_file']
-        self.dig_fn = fn['dialog_file']
+        inp_fn = fn['input_file']
+        tar_fn = fn['target_file']
+        dig_fn = fn['dialog_file']
+        std_fn = fn['standard_file']
+        prt_fn = fn['part_file']
+
+        # 保存ファイルパス
+        self.dig_fp = "data/" + dig_fn + ".txt"
+        self.dig_std_fp = "data/" + dig_fn + "_" + std_fn + ".txt"
+        self.dig_prt_fp = "data/" + dig_fn + "_" + prt_fn + ".txt"
+        self.inp_fp = "data/" + inp_fn + ".txt"
+        self.tar_fp = "data/" + tar_fn + ".txt"
+        self.inp_std_fp = "data/" + inp_fn + "_" + std_fn + ".txt"
+        self.tar_std_fp = "data/" + tar_fn + "_" + std_fn + ".txt"
+        self.inp_prt_fp = "data/" + inp_fn + "_" + prt_fn + ".txt"
+        self.tar_prt_fp = "data/" + tar_fn + "_" + prt_fn + ".txt"
 
         # 保存するかどうかを取得
         fd = config['dump']
         self.trn_fd = fd['turn_file']
         self.dig_fd = fd['dialog_file']
+        self.std_fd = fd['standard_file']
+        self.prt_fd = fd['part_file']
 
         # tweepy関連の情報取得
         cfg_auth = api_config['twitter_API']
@@ -70,7 +85,27 @@ class QueueListener(StreamListener):
         self.api = tweepy.API(self.auth)
 
         # 進捗を表示するかどうかを取得
-        self.progress = config['print']['progress']
+        self.progress = config['print_progress']
+
+        # 品詞のトークンを取得
+        pt = config['part']
+        self.noun_token = pt['noun']
+        self.verb_token = pt['verb']
+        self.adjective_token = pt['adjective']
+        self.adverb_token = pt['adverb']
+        self.particle_token = pt['particle']
+        self.auxiliary_verb_token = pt['auxiliary_verb']
+        self.conjunction_token = pt['conjunction']
+        self.prefix_token = pt['prefix']
+        self.filler_token = pt['filler']
+        self.impression_verb_token = pt['impression_verb']
+        self.three_dots_token = pt['three_dots']
+        self.phrase_point_token = pt['phrase_point']
+        self.reading_point_token = pt['reading_point']
+        self.other_token = pt['other']
+
+        # 標準形が存在しない場合の文字列
+        self.unk_standard = config['unknown_standard']
 
     # 例外処理 #################################################################
     def on_error(self, status):
@@ -146,7 +181,6 @@ class QueueListener(StreamListener):
             return False
         return True
 
-    # 対話データをキューに一時保存する
     def on_status(self, raw):
         """
         ツイートをキューに保存する
@@ -154,16 +188,16 @@ class QueueListener(StreamListener):
         @return True: 成功、False: 失敗
         """
         if isinstance(raw.get('in_reply_to_status_id'), int):
-            line = [raw['in_reply_to_status_id'], raw['user']['id'], self.del_username(unicodedata.normalize('NFKC', raw['text'])), raw['id']]
+            tweet = [raw['in_reply_to_status_id'], raw['user']['id'], self.del_username(unicodedata.normalize('NFKC', raw['text'])), raw['id']]
 
-            if self.check(line[2]):
-                line[2] = self.del_morpheme(self.normalize(line[2]))
+            if self.check(tweet[2]):
+                tweet[2], standard, part = self.del_morpheme(self.normalize(tweet[2]))
 
-                if line[2] != "":
-                    self.queue.append([line])
+                if tweet[2] != "":
+                    self.queue.append([[tweet, standard, part]])
 
                     self.tweet_ids = self.tweet_ids[-1000000:]
-                    self.tweet_ids.append(line[3])
+                    self.tweet_ids.append(tweet[3])
 
                     while len(self.queue) == self.BATCH_SIZE:
                         if not self.lookup():
@@ -177,8 +211,8 @@ class QueueListener(StreamListener):
         @return True: 成功、False: 失敗
         """
         ids = []
-        for lines in self.queue:
-            ids.append(lines[-1][0])
+        for dialogs in self.queue:
+            ids.append(dialogs[-1][0][0])
 
         replys = self.api.statuses_lookup(ids)
         replys_dic = {reply.id_str: [reply.in_reply_to_status_id, reply.user.id, self.del_username(unicodedata.normalize('NFKC', reply.text)), reply.id] for reply in replys}
@@ -187,21 +221,21 @@ class QueueListener(StreamListener):
 
         for idx in range(self.BATCH_SIZE):
             interrupte = False
-            line = replys_dic.get(str(ids[idx]))
+            tweet = replys_dic.get(str(ids[idx]))
 
             # リプライ先が本当に存在しているかを確認
-            if line:
+            if tweet:
                 # 使用データの候補として適切かを判定
-                if self.check(line[2]) and self.talker_check(line[1], idx) and line[3] not in self.tweet_ids:
-                    line[2] = self.del_morpheme(self.normalize(line[2]))
+                if self.check(tweet[2]) and self.talker_check(tweet[1], idx) and tweet[3] not in self.tweet_ids:
+                    tweet[2], standard, part = self.del_morpheme(self.normalize(tweet[2]))
 
                     # 長さが適切か最終判定
-                    if line[2] != "":
-                        self.queue[idx].append(line)
-                        self.tweet_ids.append(line[3])
+                    if tweet[2] != "":
+                        self.queue[idx].append([tweet, standard, part])
+                        self.tweet_ids.append(tweet[3])
 
                         # リプライ先がなければ対話のさかのぼりを終了して保存
-                        if not isinstance(line[0], int):
+                        if not isinstance(tweet[0], int):
                             interrupte = True
                     else:
                         interrupte = True
@@ -220,17 +254,17 @@ class QueueListener(StreamListener):
         self.queue = dellist(self.queue, dump_idxs)
         return True
 
-    def dump(self, lines):
+    def dump(self, dialog):
         """
         対話データをファイルに保存する
-        @param lines 保存する対話データ
+        @param dialog 保存する対話データ
         @return True: 成功、False: 失敗
         """
         # 時系列順に並べ替え
-        lines.reverse()
+        dialog.reverse()
 
         # ツイート内容だけのリストを作成
-        tweets = [line[2] for line in lines]
+        tweets = [[tweet[0][2], tweet[1], tweet[2]] for tweet in dialog]
 
         # 進捗確認のためのカウントを進める
         self.turn_cnt += len(tweets) - 1
@@ -241,17 +275,43 @@ class QueueListener(StreamListener):
             os.mkdir("data")
 
         if self.dig_fd:
-            with open("data/" + self.dig_fn + ".txt", 'a', encoding='utf-8') as f:
+            with open(self.dig_fp, 'a', encoding='utf-8') as f:
                 for tweet in tweets:
-                    f.write(tweet + "\n")
+                    f.write(tweet[0] + "\n")
                 f.write("\n")
 
+            if self.std_fd:
+                with open(self.dig_std_fp, 'a', encoding='utf-8') as f:
+                    for tweet in tweets:
+                        f.write(tweet[1] + "\n")
+                    f.write("\n")
+
+            if self.prt_fd:
+                with open(self.dig_prt_fp, 'a', encoding='utf-8') as f:
+                    for tweet in tweets:
+                        f.write(tweet[2] + "\n")
+                    f.write("\n")
+
         if self.trn_fd:
-            with open("data/" + self.inp_fn + ".txt", 'a', encoding='utf-8') as f_in,\
-            open("data/" + self.tar_fn + ".txt", 'a', encoding='utf-8') as f_tar:
+            with open(self.inp_fp, 'a', encoding='utf-8') as f_in,\
+            open(self.tar_fp, 'a', encoding='utf-8') as f_tar:
                 for i in range(len(tweets) - 1):
-                    f_in.write(tweets[i] + "\n")
-                    f_tar.write(tweets[i + 1] + "\n")
+                    f_in.write(tweets[i][0] + "\n")
+                    f_tar.write(tweets[i + 1][0] + "\n")
+
+            if self.std_fd:
+                with open(self.inp_std_fp, 'a', encoding='utf-8') as f_in,\
+                open(self.tar_std_fp, 'a', encoding='utf-8') as f_tar:
+                    for i in range(len(tweets) - 1):
+                        f_in.write(tweets[i][1] + "\n")
+                        f_tar.write(tweets[i + 1][1] + "\n")
+
+            if self.prt_fd:
+                with open(self.inp_prt_fp, 'a', encoding='utf-8') as f_in,\
+                open(self.tar_prt_fp, 'a', encoding='utf-8') as f_tar:
+                    for i in range(len(tweets) - 1):
+                        f_in.write(tweets[i][2] + "\n")
+                        f_tar.write(tweets[i + 1][2] + "\n")
 
         # 標準出力に進捗状況を出力
         if self.progress:
@@ -263,43 +323,43 @@ class QueueListener(StreamListener):
 
     def log(self):
         """収集したツイート数や経過時間を出力"""
-        print(" (" + self.dig_fn + ": " + str(self.dialog_cnt) + ", " + self.inp_fn + "/" + self.tar_fn + ": " + str(self.turn_cnt) + ") " + ('%.2f' % (self.cum_time + time.time() - self.start_time)) + "[sec]", flush=True)
+        print(" (dialog: " + str(self.dialog_cnt) + ", turn: " + str(self.turn_cnt) + ") " + ('%.2f' % (self.cum_time + time.time() - self.start_time)) + "[sec]", flush=True)
 
-    def del_username(self, tweet):
+    def del_username(self, text):
         """
         ツイートデータのテキストからユーザ名を除去
-        @param tweet ツイートデータのテキスト
+        @param text ツイートデータのテキスト
         @return ユーザ名を除去したツイートデータのテキスト
         """
-        tweet = re.sub("(^|\s)(@|＠)(\w+)", "", tweet)
-        return tweet
+        text = re.sub("(^|\s)(@|＠)(\w+)", "", text)
+        return text
 
-    def check(self, tweet):
+    def check(self, text):
         """
         ツイートデータのテキストに不適切な情報が含まれていないかを判定
-        @param tweet ツイートデータのテキスト
+        @param text ツイートデータのテキスト
         @return True: 適切、False: 不適切
         """
         # URLを含む（画像も含む？）
-        if re.compile("((ftp|http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&amp;%@!&#45;\/]))?)").search(tweet):
+        if re.compile("((ftp|http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&amp;%@!&#45;\/]))?)").search(text):
             return False
         # ハッシュタグを含む
-        if re.compile("(?:^|[^ーー゛゜々ヾヽぁ-ヶ一-龠a-zA-Z0-9&_/>]+)[#＃]([ー゛゜々ヾヽぁ-ヶ一-龠a-zA-Z0-9_]*[ー゛゜々ヾヽぁ-ヶ一-龠a-zA-Z]+[ー゛゜々ヾヽぁ-ヶ一-龠a-zA-Z0-9_]*)").search(tweet):
+        if re.compile("(?:^|[^ーー゛゜々ヾヽぁ-ヶ一-龠a-zA-Z0-9&_/>]+)[#＃]([ー゛゜々ヾヽぁ-ヶ一-龠a-zA-Z0-9_]*[ー゛゜々ヾヽぁ-ヶ一-龠a-zA-Z]+[ー゛゜々ヾヽぁ-ヶ一-龠a-zA-Z0-9_]*)").search(text):
             return False
         # 英数字や特定の記号を含む
-        if re.compile("[a-zA-Z0-9_]").search(tweet):
+        if re.compile("[a-zA-Z0-9_]").search(text):
             return False
         # ツイッター用語を含む
-        if re.compile("アイコン|あいこん|トプ|とぷ|ヘッダー|へっだー|たぐ|ツイ|ツイート|ついーと|ふぉろ|フォロ|リプ|りぷ|リツ|りつ|いいね|お気に入り|ふぁぼ|ファボ|リム|りむ|ブロック|ぶろっく|スパブロ|すぱぶろ|ブロ解|ぶろ解|鍵|アカ|垢|タグ|ダイレクトメッセージ|空りぷ|空リプ|巻き込|まきこ|マキコ").search(tweet):
+        if re.compile("アイコン|あいこん|トプ|とぷ|ヘッダー|へっだー|たぐ|ツイ|ツイート|ついーと|ふぉろ|フォロ|リプ|りぷ|リツ|りつ|いいね|お気に入り|ふぁぼ|ファボ|リム|りむ|ブロック|ぶろっく|スパブロ|すぱぶろ|ブロ解|ぶろ解|鍵|アカ|垢|タグ|ダイレクトメッセージ|空りぷ|空リプ|巻き込|まきこ|マキコ").search(text):
             return False
         # 時期の表現を含む
-        if re.compile("明日|あした|明後日|あさって|明々後日|明明後日|しあさって|今日|昨日|おととい|きょう|きのう|一昨日|来週|再来週|今年|先週|先々週|今年|去年|来年|おととい|らいしゅう|さらいしゅう|せんしゅう|せんせんしゅう|きょねん|らいねん|ことし|こんねん").search(tweet):
+        if re.compile("明日|あした|明後日|あさって|明々後日|明明後日|しあさって|今日|昨日|おととい|きょう|きのう|一昨日|来週|再来週|今年|先週|先々週|今年|去年|来年|おととい|らいしゅう|さらいしゅう|せんしゅう|せんせんしゅう|きょねん|らいねん|ことし|こんねん").search(text):
             return False
         # 漢数字を含む
-        if re.compile("[一二三四五六七八九十百千万億兆〇]").search(tweet):
+        if re.compile("[一二三四五六七八九十百千万億兆〇]").search(text):
             return False
         # 特定のネットスラングを含む
-        if re.compile("ナカーマ|イキスギ|いきすぎ|スヤァ|すやぁ|うぇーい|ウェーイ|おなしゃす|アザッス|あざっす|ドヤ|どや|ワカリミ|わかりみ").search(tweet):
+        if re.compile("ナカーマ|イキスギ|いきすぎ|スヤァ|すやぁ|うぇーい|ウェーイ|おなしゃす|アザッス|あざっす|ドヤ|どや|ワカリミ|わかりみ").search(text):
             return False
         return True
 
@@ -307,90 +367,143 @@ class QueueListener(StreamListener):
         """
         二話者の交互発話による対話であるかを判定
         @param talker 話者ID
+        @param idx キュー内の対話ID
         @return True: 適切、False: 不適切
         """
-        if talker != self.queue[idx][-1][1] and (len(self.queue[idx]) == 1 or talker == self.queue[idx][-2][1]):
+        if talker != self.queue[idx][-1][0][1] and (len(self.queue[idx]) == 1 or talker == self.queue[idx][-2][0][1]):
             return True
         return False
 
-    def normalize(self, tweet):
+    def normalize(self, text):
         """
         ツイートデータのテキストに正規化などのフィルタ処理を行う
-        @param tweet ツイートデータのテキスト
+        @param text ツイートデータのテキスト
         @return フィルタ処理を施したツイートデータのテキスト
         """
-        tweet = re.sub("\([^笑泣嬉悲驚汗爆渋苦困死楽怒哀呆殴涙藁]+?\)", " ", tweet)
-        tweet = re.sub("[^ぁ-んァ-ヶｧ-ｳﾞ一-龠々ー～〜、。！？!?,，.．\r\n]", " ", tweet)
+        text = re.sub("\([^笑泣嬉悲驚汗爆渋苦困死楽怒哀呆殴涙藁]+?\)", " ", text)
+        text = re.sub("[^ぁ-んァ-ヶｧ-ｳﾞ一-龠々ー～〜、。！？!?,，.．\r\n]", " ", text)
 
-        tweet = re.sub("[,，]", "、", tweet)
-        tweet = re.sub("[．.]", "。", tweet)
-        tweet = re.sub("〜", "～", tweet)
-        tweet = re.sub("、(\s*、)+|。(\s*。)+", "...", tweet)
+        text = re.sub("[,，]", "、", text)
+        text = re.sub("[．.]", "。", text)
+        text = re.sub("〜", "～", text)
+        text = re.sub("、(\s*、)+|。(\s*。)+", "...", text)
 
-        tweet = re.sub("!+", "！", tweet)
-        tweet = re.sub("！(\s*！)+", "！", tweet)
-        tweet = re.sub("\?+", "？", tweet)
-        tweet = re.sub("？(\s*？)+", "？", tweet)
+        text = re.sub("!+", "！", text)
+        text = re.sub("！(\s*！)+", "！", text)
+        text = re.sub("\?+", "？", text)
+        text = re.sub("？(\s*？)+", "？", text)
 
-        tweet = re.sub("～(\s*～)+", "～", tweet)
-        tweet = re.sub("ー(\s*ー)+", "ー", tweet)
+        text = re.sub("～(\s*～)+", "～", text)
+        text = re.sub("ー(\s*ー)+", "ー", text)
 
-        tweet = re.sub("\r\n|\n|\r", "。", tweet)
+        text = re.sub("\r\n|\n|\r", "。", text)
 
-        tweet += "。"
-        tweet = re.sub("[、。](\s*[、。])+", "。", tweet)
+        text += "。"
+        text = re.sub("[、。](\s*[、。])+", "。", text)
 
-        tweet = re.sub("[。、！](\s*[。、！])+", "！", tweet)
-        tweet = re.sub("[。、？](\s*[。、？])+", "？", tweet)
-        tweet = re.sub("((！\s*)+？|(？\s*)+！)(\s*[！？])*", "!?", tweet)
+        text = re.sub("[。、！](\s*[。、！])+", "！", text)
+        text = re.sub("[。、？](\s*[。、？])+", "？", text)
+        text = re.sub("((！\s*)+？|(？\s*)+！)(\s*[！？])*", "!?", text)
 
         for w in ["っ", "笑", "泣", "嬉", "悲", "驚", "汗", "爆", "渋", "苦", "困", "死", "楽", "怒", "哀", "呆", "殴", "涙", "藁"]:
-            tweet = re.sub(w + "(\s*" + w + ")+", " " + w + " ", tweet)
+            text = re.sub(w + "(\s*" + w + ")+", " " + w + " ", text)
 
-        tweet = re.sub("、\s*([笑泣嬉悲驚汗爆渋苦困死楽怒哀呆殴涙藁])\s*。", " \\1。", tweet)
-        tweet = re.sub("(。|！|？|!\?)\s*([笑泣嬉悲驚汗爆渋苦困死楽怒哀呆殴涙藁])\s*。", " \\2\\1", tweet)
+        text = re.sub("、\s*([笑泣嬉悲驚汗爆渋苦困死楽怒哀呆殴涙藁])\s*。", " \\1。", text)
+        text = re.sub("(。|！|？|!\?)\s*([笑泣嬉悲驚汗爆渋苦困死楽怒哀呆殴涙藁])\s*。", " \\2\\1", text)
 
-        tweet = re.sub("、", " 、 ", tweet)
-        tweet = re.sub("。", " 。\n", tweet)
+        text = re.sub("、", " 、 ", text)
+        text = re.sub("。", " 。\n", text)
 
-        tweet = re.sub("(\.\s*)+", " ... ", tweet)
-        tweet = re.sub("！", " ！\n", tweet)
-        tweet = re.sub("？", " ？\n", tweet)
-        tweet = re.sub("!\?", " !?\n", tweet)
+        text = re.sub("(\.\s*)+", " ... ", text)
+        text = re.sub("！", " ！\n", text)
+        text = re.sub("？", " ？\n", text)
+        text = re.sub("!\?", " !?\n", text)
 
-        tweet = re.sub("\n(\s*[～ー])+", "\n", tweet)
+        text = re.sub("\n(\s*[～ー])+", "\n", text)
 
-        tweet = re.sub("^([\s\n]*[。、！？!?ー～]+)+", "", tweet)
-        tweet = re.sub("(.+?)\\1{3,}", "\\1\\1\\1", tweet)
+        text = re.sub("^([\s\n]*[。、！？!?ー～]+)+", "", text)
+        text = re.sub("(.+?)\\1{3,}", "\\1\\1\\1", text)
 
-        return tweet
+        return text
 
-    def del_morpheme(self, tweet):
+    def del_morpheme(self, text):
         """
         ツイートデータのテキストから特定の形態素を除去する
-        @param tweet ツイートデータのテキスト
+        @param text ツイートデータのテキスト
         @return 特定の形態素を除去したツイートデータのテキスト
         """
-        lines = tweet.strip().split("\n")
-        result = ""
+        lines = text.strip().split("\n")
+        result, standard, part = "", "", ""
 
         for line in lines:
-            add_result = ""
-            morphemes = tagger.parse(line).strip().split()
+            add_result, add_standard, add_part = "", "", ""
+            node = tagger.parseToNode(line)
 
-            for morpheme in morphemes:
-                if morpheme not in ["ノ", "ーノ", "ロ", "艸", "屮", "罒", "灬", "彡", "ヮ", "益",\
+            while node:
+                feature = node.feature.split(',')
+                if feature[0] == "BOS/EOS":
+                    node = node.next
+                    continue
+
+                if node.surface in ["ノ", "ーノ", "ロ", "艸", "屮", "罒", "灬", "彡", "ヮ", "益",\
                 "皿", "タヒ", "厂", "厂厂", "啞", "卍", "ノノ", "ノノノ", "ノシ", "ノツ",\
                 "癶", "癶癶", "乁", "乁厂", "マ", "んご", "んゴ", "ンゴ", "にき", "ニキ", "ナカ", "み", "ミ"]:
-                    if morpheme not in ["つ", "っ"] or add_result != "":
-                        add_result += morpheme + " "
+                    node = node.next
+                    continue
 
-            add_result = add_result.strip()
-            if add_result not in ["、", "。", "！", "？", "!?", "", "... 。", "... ！", "... ？", "... !?",\
+                if node.surface in ["つ", "っ"] and add_result == "":
+                    node = node.next
+                    continue
+
+                if feature[0] == "名詞":
+                    token = self.noun_token
+                elif feature[0] == "動詞":
+                    token = self.verb_token
+                elif feature[0] == "形容詞":
+                    token = self.adjective_token
+                elif feature[0] == "副詞":
+                    token = self.adverb_token
+                elif feature[0] == "助詞":
+                    token = self.particle_token
+                elif feature[0] == "助動詞":
+                    token = self.auxiliary_verb_token
+                elif feature[0] == "接続詞":
+                    token = self.conjunction_token
+                elif feature[0] == "接頭詞":
+                    token = self.prefix_token
+                elif feature[0] == "フィラー":
+                    token = self.filler_token
+                elif feature[0] == "感動詞":
+                    token = self.impression_verb_token
+                elif node.surface == "...":
+                    token = self.three_dots_token
+                elif node.surface in ["。", "！", "？", "!?"]:
+                    token = self.phrase_point_token
+                elif node.surface == "、":
+                    token = self.reading_point_token
+                else:
+                    token = self.other_token
+
+                add_result += node.surface + " "
+                if re.compile("[^ぁ-んァ-ヶｧ-ｳﾞ一-龠々ー～]").search(feature[6]):
+                    add_standard += node.surface + " "
+                elif token in [self.three_dots_token, self.phrase_point_token, self.reading_point_token]:
+                    add_standard += node.surface + " "
+                elif feature[6] == "*":
+                    add_standard += self.unk_standard + " "
+                else:
+                    add_standard += feature[6] + " "
+                add_part += token + " "
+
+                node = node.next
+
+            if add_result.strip() not in ["、", "。", "！", "？", "!?", "", "... 。", "... ！", "... ？", "... !?",\
             "人 。", "つ 。", "っ 。", "笑 。", "笑 ！", "笑 ？", "笑 !?"]:
-                result += add_result + " "
+                result += add_result
+                standard += add_standard
+                part += add_part
 
-        return result.strip()
+        return result.strip(), standard.strip(), part.strip()
 
     def save_tmp(self):
         """
@@ -463,7 +576,7 @@ def get_twitter_corpus(config, api_config):
 
 if __name__ == '__main__':
     # 設定ファイルを読み込む
-    config = yaml.load(stream=open("config/config.yml", 'rt'), Loader=yaml.SafeLoader)
+    config = yaml.load(stream=open("config/config.yml", 'rt', encoding='utf-8'), Loader=yaml.SafeLoader)
     # Twitter API の情報を読み込む
     api_config = yaml.load(stream=open("config/api.yml", 'rt'), Loader=yaml.SafeLoader)
 
