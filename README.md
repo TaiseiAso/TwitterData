@@ -65,7 +65,7 @@
     - standard_file: 標準形/表層形に変換したファイル
     - part_file: 品詞分類したファイル
 - filter: フィルタリングの内容
-    - length: 長さに関する制限 (整数)
+    - length: 長さに関する制限 (dump適用後) (整数)
         - len_min: 全体の長さの最小
         - len_max: 全体の長さの最大
         - sent_len_min: 文単位の長さの最小
