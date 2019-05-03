@@ -2,8 +2,8 @@
 
 """Twitterから二話者間の複数ターンの長文対話を取得"""
 __author__ = "Aso Taisei"
-__version__ = "1.0.2"
-__date__ = "29 Apr 2019"
+__version__ = "1.0.3"
+__date__ = "4 May 2019"
 
 
 # 必要モジュールのインポート
@@ -43,8 +43,9 @@ class QueueListener(StreamListener):
         # メンバの初期化
         self.queue = []
         self.BATCH_SIZE = 100
-        self.turn_cnt = 0
-        self.dialog_cnt = 0
+        self.trn_cnt = 0
+        self.dig_cnt = 0
+        self.dump_cnt = 0
         self.tweet_ids = []
         self.cum_time = 0
         self.start_time = time.time()
@@ -263,15 +264,15 @@ class QueueListener(StreamListener):
         # ツイート内容だけのリストを作成
         tweets = [[tweet[0][2], tweet[1], tweet[2]] for tweet in dialog]
 
-        # 進捗確認のためのカウントを進める
-        self.turn_cnt += len(tweets) - 1
-        self.dialog_cnt += 1
-
         # ファイルに出力保存
         if not os.path.isdir("data"):
             os.mkdir("data")
 
+        self.dump_cnt += 1
+
         if self.dig_fd:
+            self.dig_cnt += 1
+
             with open(self.dig_fp, 'a', encoding='utf-8') as f:
                 for tweet in tweets:
                     f.write(tweet[0] + "\n")
@@ -290,6 +291,8 @@ class QueueListener(StreamListener):
                     f.write("\n")
 
         if self.trn_fd:
+            self.trn_cnt += len(tweets) - 1
+
             with open(self.inp_fp, 'a', encoding='utf-8') as f_in,\
             open(self.tar_fp, 'a', encoding='utf-8') as f_tar:
                 for i in range(len(tweets) - 1):
@@ -313,14 +316,14 @@ class QueueListener(StreamListener):
         # 標準出力に進捗状況を出力
         if self.progress:
             print("#", end="", flush=True)
-            if self.dialog_cnt % 10 == 0:
+            if self.dump_cnt % 10 == 0:
                 self.log()
 
         return True
 
     def log(self):
         """収集したツイート数や経過時間を出力"""
-        print(" (dialog: " + str(self.dialog_cnt) + ", turn: " + str(self.turn_cnt) + ") " + ('%.2f' % (self.cum_time + time.time() - self.start_time)) + "[sec]", flush=True)
+        print(" (dialog: " + str(self.dig_cnt) + ", turn: " + str(self.trn_cnt) + ") " + ('%.2f' % (self.cum_time + time.time() - self.start_time)) + "[sec]", flush=True)
 
     def del_username(self, text):
         """
@@ -350,7 +353,7 @@ class QueueListener(StreamListener):
         if re.compile("アイコン|あいこん|トプ|とぷ|ヘッダー|へっだー|たぐ|タグ|ツイ|つい|ふぉろ|フォロ|リプ|りぷ|リツ|りつ|いいね|お気に入り|ふぁぼ|ファボ|リム|りむ|ブロック|ぶろっく|スパブロ|すぱぶろ|ブロ解|ぶろ解|鍵|アカ|垢|ダイレクトメッセージ|巻き込|まきこ").search(text):
             return False
         # 特定のスラングを含む
-        if re.compile("ナカーマ|イキスギ|いきすぎ|スヤァ|すやぁ|うぇーい|ウェーイ|おなしゃす|アザッス|あざっす|ドヤ|どや|ワカリミ|わかりみ").search(text):
+        if re.compile("ナカーマ|イキスギ|いきすぎ|スヤ|すや|うぇーい|ウェーイ|おなしゃす|アザッス|あざっす|ドヤ|どや|ワカリミ|わかりみ|分かりみ").search(text):
             return False
         return True
 
@@ -422,6 +425,8 @@ class QueueListener(StreamListener):
         ツイートデータのテキストから特定の形態素を除去する
         @param text ツイートデータのテキスト
         @return 特定の形態素を除去したツイートデータのテキスト
+        @return 標準形/表層系のテキスト
+        @return 品詞列
         """
         lines = text.strip().split("\n")
         result, standard, part = "", "", ""
@@ -436,11 +441,10 @@ class QueueListener(StreamListener):
                     node = node.next
                     continue
 
-                if node.surface in [".", "!", "?"]:
-                    nod = node.next
-                    continue
+                if node.surface == "?":
+                    node.surface = "!?"
 
-                if node.surface in ["ノ", "ーノ", "ロ", "艸", "屮", "罒", "灬", "彡", "ヮ", "益",\
+                if node.surface in [".", "..", "!", "ノ", "ーノ", "ロ", "艸", "屮", "罒", "灬", "彡", "ヮ", "益",\
                 "皿", "タヒ", "厂", "厂厂", "啞", "卍", "ノノ", "ノノノ", "ノシ", "ノツ",\
                 "癶", "癶癶", "乁", "乁厂", "マ", "んご", "んゴ", "ンゴ", "にき", "ニキ", "ナカ", "み", "ミ"]:
                     node = node.next
@@ -507,8 +511,8 @@ class QueueListener(StreamListener):
             os.mkdir("tmp")
 
         with open("tmp/cnt.txt", 'w', encoding='utf-8') as f:
-            f.write(str(self.dialog_cnt) + "\n")
-            f.write(str(self.turn_cnt) + "\n")
+            f.write(str(self.dig_cnt) + "\n")
+            f.write(str(self.trn_cnt) + "\n")
             f.write(str(self.cum_time + time.time() - self.start_time) + "\n")
 
         with open("tmp/id.txt", 'w', encoding='utf-8') as f:
@@ -525,8 +529,8 @@ class QueueListener(StreamListener):
         if os.path.isdir("tmp"):
             if os.path.isfile("tmp/cnt.txt"):
                 with open("tmp/cnt.txt", 'r', encoding='utf-8') as f:
-                    self.dialog_cnt = int(f.readline().strip())
-                    self.turn_cnt = int(f.readline().strip())
+                    self.dig_cnt = int(f.readline().strip())
+                    self.trn_cnt = int(f.readline().strip())
                     self.cum_time = float(f.readline().strip())
 
             if os.path.isfile("tmp/id.txt"):

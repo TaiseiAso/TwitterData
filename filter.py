@@ -131,7 +131,7 @@ class TweetFilter():
         """
         指定した品詞のみを除去する
         @param text 空白で分かち書きされたテキスト
-        @param standard 標準形/表層形に変換されたテキスト
+        @param standard 標準形/表層形のテキスト
         @param part 品詞列
         @return 品詞除去されたテキスト
         @return 品詞除去された標準形/表層形のテキスト
@@ -160,7 +160,6 @@ class TweetFilter():
 
     def turn_filtering(self):
         """入出力コーパスをフィルタリングする"""
-        std, prt = False, False
         cnt, cnt_ = 0, 0
 
         # ファイルを開く
@@ -175,6 +174,8 @@ class TweetFilter():
             f_tar_std = open("data/" + self.tar_std_fp, 'r', encoding='utf-8')
             f_inp_std_fi = open("filtered/" + self.inp_std_fp, 'w', encoding='utf-8')
             f_tar_std_fi = open("filtered/" + self.tar_std_fp, 'w', encoding='utf-8')
+        else:
+            std = False
 
         if os.path.isfile("data/" + self.inp_prt_fp) and os.path.isfile("data/" + self.tar_prt_fp):
             prt = True
@@ -182,6 +183,8 @@ class TweetFilter():
             f_tar_prt = open("data/" + self.tar_prt_fp, 'r', encoding='utf-8')
             f_inp_prt_fi = open("filtered/" + self.inp_prt_fp, 'w', encoding='utf-8')
             f_tar_prt_fi = open("filtered/" + self.tar_prt_fp, 'w', encoding='utf-8')
+        else:
+            prt = False
 
         # ファイルから読み込む
         line_inp = f_inp.readline()
@@ -242,7 +245,6 @@ class TweetFilter():
 
     def dialog_filtering(self):
         """対話コーパスをフィルタリングする"""
-        std, prt = False, False
         cnt, cnt_ = 0, 0
 
         # ファイルを開く
@@ -253,11 +255,15 @@ class TweetFilter():
             std = True
             f_dig_std = open("data/" + self.dig_std_fp, 'r', encoding='utf-8')
             f_dig_std_fi = open("filtered/" + self.dig_std_fp, 'w', encoding='utf-8')
+        else:
+            std = False
 
         if os.path.isfile("data/" + self.dig_prt_fp):
             prt = True
             f_dig_prt = open("data/" + self.dig_prt_fp, 'r', encoding='utf-8')
             f_dig_prt_fi = open("filtered/" + self.dig_prt_fp, 'w', encoding='utf-8')
+        else:
+            prt = False
 
         # ファイルから読み込む
         line_dig = f_dig.readline()
@@ -368,10 +374,18 @@ class TweetFilter():
             print("no filtered file")
 
 
+def filtering_twitter_corpus(config):
+    """
+    収集した対話データをフィルタリング
+    @param config 設定ファイルの情報
+    """
+    f = TweetFilter(config)
+    f.filtering()
+
+
 if __name__ == '__main__':
     # 設定ファイルを読み込む
     config = yaml.load(stream=open("config/config.yml", 'rt', encoding='utf-8'), Loader=yaml.SafeLoader)
 
     # フィルタ処理開始
-    f = TweetFilter(config)
-    f.filtering()
+    filtering_twitter_corpus(config)
