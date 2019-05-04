@@ -199,8 +199,8 @@ class TweetFilter():
 
             # 指定した品詞を除外
             if prt:
-                line_inp, line_inp_std, line_inp_prt = self.del_part(line_inp, line_inp_std if std else None, line_inp_prt)
-                line_tar, line_tar_std, line_tar_prt = self.del_part(line_tar, line_tar_std if std else None, line_tar_prt)
+                line_inp, line_inp_std, line_inp_prt = self.del_part(line_inp, line_inp_std, line_inp_prt)
+                line_tar, line_tar_std, line_tar_prt = self.del_part(line_tar, line_tar_std, line_tar_prt)
 
             # 適切なデータであるか判定
             if self.text_check(line_inp) and self.text_check(line_tar) and self.diff_check(line_inp, line_tar) and\
