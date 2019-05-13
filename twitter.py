@@ -90,9 +90,12 @@ class QueueListener(StreamListener):
 
         # 品詞のトークンを取得
         pt = config['part']
-        self.noun_token = pt['noun']
-        self.verb_token = pt['verb']
-        self.adjective_token = pt['adjective']
+        self.noun_main_token = pt['noun_main']
+        self.noun_sub_token = pt['noun_sub']
+        self.verb_main_token = pt['verb_main']
+        self.verb_sub_token = pt['verb_sub']
+        self.adjective_main_token = pt['adjective_main']
+        self.adjective_sub_token = pt['adjective_sub']
         self.adverb_token = pt['adverb']
         self.particle_token = pt['particle']
         self.auxiliary_verb_token = pt['auxiliary_verb']
@@ -441,10 +444,7 @@ class QueueListener(StreamListener):
                     node = node.next
                     continue
 
-                if node.surface == "?":
-                    node.surface = "!?"
-
-                if node.surface in [".", "..", "!", "ノ", "ーノ", "ロ", "艸", "屮", "罒", "灬", "彡", "ヮ", "益",\
+                if node.surface in [".", "..", "!", "?", "ノ", "ーノ", "ロ", "艸", "屮", "罒", "灬", "彡", "ヮ", "益",\
                 "皿", "タヒ", "厂", "厂厂", "啞", "卍", "ノノ", "ノノノ", "ノシ", "ノツ",\
                 "癶", "癶癶", "乁", "乁厂", "マ", "んご", "んゴ", "ンゴ", "にき", "ニキ", "ナカ", "み", "ミ"]:
                     node = node.next
@@ -455,11 +455,20 @@ class QueueListener(StreamListener):
                     continue
 
                 if feature[0] == "名詞":
-                    token = self.noun_token
+                    if feature[1] in ["サ変接続", "一般", "形容動詞語幹", "固有名詞"]:
+                        token = self.noun_main_token
+                    else:
+                        token = self.noun_sub_token
                 elif feature[0] == "動詞":
-                    token = self.verb_token
+                    if feature[1] in ["自立"]:
+                        token = self.verb_main_token
+                    else:
+                        token = self.verb_sub_token
                 elif feature[0] == "形容詞":
-                    token = self.adjective_token
+                    if feature[1] in ["自立"]:
+                        token = self.adjective_main_token
+                    else:
+                        token = self.adjective_sub_token
                 elif feature[0] == "副詞":
                     token = self.adverb_token
                 elif feature[0] == "助詞":
